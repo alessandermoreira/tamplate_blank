@@ -40,7 +40,8 @@ app.put("/users/:id", authenticateToken, async (req, res) => {
     cep, cidade, cpf, email, endereco, nivelacesso, nome, observacoes, setor, telefone, cargo, blocked, senha, confirmarSenha
   } = req.body;
 
-  const cpf_apenasNumeros = cpf.replaceAll('.','').replaceAll('-','');  
+  // Remove formatação de CPF ou CNPJ
+  const cpf_apenasNumeros = cpf.replaceAll('.','').replaceAll('-','').replaceAll('/','');
   const cep_apenasNumeros = cep.replaceAll('-','');
   try {
     const result = await pool.query(
@@ -90,16 +91,21 @@ app.put("/users/:id", authenticateToken, async (req, res) => {
 
     res.status(200).json(result.rows[0]);
   } catch (error) {
-    console.error("Erro ao editar usuário:", error);
-    res.status(500).json({ message: "Erro ao editar usuário" });
+    if(error.detail){
+      res.status(500).json({ message: error.detail });
+    }else{
+      console.error("Erro ao editar usuário:", error);
+      res.status(500).json({ message: "Erro ao editar usuário" });
+    }
   }
 });
 // Rota para registrar um novo usuário
 app.post("/register", async (req, res) => {
-  const { cep, cidade, confirmarSenha, cpf, email, endereco, 
+  const { cep, cidade, cpf, email, endereco,
     nivelacesso, nome, observacoes, senha, setor, telefone, cargo, blocked} = req.body;
 
-  const cpf_apenasNumeros = cpf.replaceAll('.','').replaceAll('-','');
+  // Remove formatação de CPF ou CNPJ
+  const cpf_apenasNumeros = cpf.replaceAll('.','').replaceAll('-','').replaceAll('/','');
   
   // Verifica se o formulário está completo
   if (!nome || !senha) {
@@ -113,7 +119,7 @@ app.post("/register", async (req, res) => {
 
   const result2 = await pool.query("SELECT * FROM Users WHERE cpf = $1", [cpf_apenasNumeros]);
   if (result2.rows.length > 0) {
-    return res.status(400).json({ message: "CPF já cadastrado" });
+    return res.status(400).json({ message: cpf_apenasNumeros.length === 11 ? "CPF já cadastrado" : "CNPJ já cadastrado" });
   }  
 
   // Criptografa a senha
@@ -262,10 +268,73 @@ app.get("/dashboard", authenticateToken, (req, res) => {
 app.get("/users", authenticateToken, async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM Users");
+
     res.status(200).json(result.rows);
   } catch (error) {
     console.error("Erro ao buscar usuários:", error);
-    res.status(500).json({ message: "Erro ao buscar usuários" });
+    res.status(500).json({ message: "Erro ao buscar usuários" + error.message });
+  }
+});
+
+// Rota para listar todos os produtos
+app.get("/products", authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM Products");
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error("Erro ao buscar produtos:", error);
+    res.status(500).json({ message: "Erro ao buscar produtos" });
+  }
+});
+
+// Rota para cadastrar novo produto
+app.post("/products", authenticateToken, async (req, res) => {
+  const { name, category, price, stock, description } = req.body;
+  if (!name || !category || price === undefined || stock === undefined) {
+    return res.status(400).json({ message: "Campos obrigatórios ausentes." });
+  }
+  try {
+    const result = await pool.query(
+      "INSERT INTO Products (name, category, price, stock, description) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+      [name, category, price, stock, description || null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error("Erro ao cadastrar produto:", error);
+    res.status(500).json({ message: "Erro ao cadastrar produto" });
+  }
+});
+
+// Rota para atualizar produto existente
+app.put("/products/:id", authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { name, category, price, stock, description } = req.body;
+
+  if (!name || !category || price === undefined || stock === undefined) {
+    return res.status(400).json({ message: "Campos obrigatórios ausentes." });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE Products SET
+        name = $1,
+        category = $2,
+        price = $3,
+        stock = $4,
+        description = $5
+      WHERE id = $6
+      RETURNING *`,
+      [name, category, price, stock, description || null, id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: "Produto não encontrado" });
+    }
+
+    res.status(200).json(result.rows[0]);
+  } catch (error) {
+    console.error("Erro ao atualizar produto:", error);
+    res.status(500).json({ message: "Erro ao atualizar produto" });
   }
 });
 

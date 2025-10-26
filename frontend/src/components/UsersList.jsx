@@ -125,7 +125,7 @@ const UsersList = ({onNavigate, setUserEdit}) => {
 
         <CardContent>
           <br/>
-          <h1 className="text-2xl font-semibold text-gray-900 mb-4">Usuários Registrados</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-4">Clientes</h1>
           <div className="flex items-center justify-between mb-4">
             <input
               type="text"
@@ -135,7 +135,7 @@ const UsersList = ({onNavigate, setUserEdit}) => {
               onChange={e => setFilter(e.target.value)}
             />
             <button style={{float: "right", right: "10px", cursor: "pointer"}} onClick={() => onNavigate("user-registration")}>
-              Novo Usuário
+              Novo
               <UserPlus className="ml-2 inline-block" />
             </button>            
           </div>
@@ -148,7 +148,7 @@ const UsersList = ({onNavigate, setUserEdit}) => {
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CPF</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CPF/CNPJ</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Setor</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nível de Acesso</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telefone</th>

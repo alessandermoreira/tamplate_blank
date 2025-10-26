@@ -6,7 +6,7 @@ CREATE TABLE Users (
     cep VARCHAR(8) NOT NULL,                -- CEP no formato texto de 8 caracteres (ex.: 12345678)
     cidade VARCHAR(100) NOT NULL,           -- Nome da cidade
     senha VARCHAR(255) NOT NULL,            -- Senha criptografada
-    cpf VARCHAR(11) UNIQUE NOT NULL,        -- CPF no formato texto de 11 caracteres (ex.: 12345678901)
+    cpf VARCHAR(14) UNIQUE NOT NULL,        -- CPF (11 caracteres) ou CNPJ (14 caracteres) sem formatação
     email VARCHAR(100) UNIQUE NOT NULL,     -- Email único e obrigatório
     endereco TEXT NOT NULL,                 -- Campo para o endereço completo
     nivelAcesso VARCHAR(20) NOT NULL,       -- Nível de acesso do usuário (ex.: 1 = Admin, 2 = Usuário)

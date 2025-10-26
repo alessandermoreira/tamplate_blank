@@ -97,7 +97,7 @@ const Login = ({ onLogin }) => {
                   alt="User avatar"
                   className="w-8 h-8 rounded-full"
                 />
-                <h1 className="text-lg font-semibold text-gray-700">System Control</h1>
+                <h1 className="text-lg font-semibold text-gray-700">Marcaí Digital</h1>
               </div>
             </div>
           </div>

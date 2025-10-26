@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button.jsx';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.jsx';
 import { Badge } from '@/components/ui/badge.jsx';
@@ -8,24 +8,120 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea.jsx';
 import { ArrowLeft, Save, User, Shield, Building, Mail, Phone, Bell } from 'lucide-react';
 import axios from 'axios';
-import { useToast } from '../contexts/ToastContext.jsx';
+
 import { Switch } from "@/components/ui/switch.jsx";
 import { useAuth } from "../contexts/AuthContext";
+import { useToast } from '@/contexts/ToastContext';
 const VITE_URL_SERVER = import.meta.env.VITE_URL_SERVER;
 
 const UserRegistration = ({onNavigate, userEdit}) => {
   const { showSuccess, showError } = useToast();
-  const [formData, setFormData] = useState(userEdit);
+  const [formData, setFormData] = useState(userEdit || {});
   const { getToken } = useAuth();
   const [alterarSenha, setAlterarSenha] = useState(false);
   const [errors, setErrors] = useState({});
 
+  // Detecta o tipo de documento baseado no tamanho (sem formatação)
+  const detectDocumentType = (cpf) => {
+    if (!cpf) return 'cpf';
+    const onlyNumbers = cpf.replace(/\D/g, '');
+    return onlyNumbers.length > 11 ? 'cnpj' : 'cpf';
+  };
+
+  // Função para aplicar máscara de CPF
+  const applyCpfMask = (value) => {
+    // Remove tudo que não é dígito
+    value = value.replace(/\D/g, '');
+    // Limita a 11 dígitos
+    value = value.slice(0, 11);
+    // Aplica a máscara: 123.456.789-00
+    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+    value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    return value;
+  };
+
+  // Função para aplicar máscara de CNPJ
+  const applyCnpjMask = (value) => {
+    // Remove tudo que não é dígito
+    value = value.replace(/\D/g, '');
+    // Limita a 14 dígitos
+    value = value.slice(0, 14);
+    // Aplica a máscara: 12.345.678/0001-90
+    value = value.replace(/(\d{2})(\d)/, '$1.$2');
+    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+    value = value.replace(/(\d{3})(\d)/, '$1/$2');
+    value = value.replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+    return value;
+  };
+
+  // Função para aplicar máscara de telefone
+  const applyPhoneMask = (value) => {
+    // Remove tudo que não é dígito
+    value = value.replace(/\D/g, '');
+    // Limita a 11 dígitos
+    value = value.slice(0, 11);
+    // Aplica a máscara: (11) 99999-9999 ou (11) 9999-9999
+    value = value.replace(/(\d{2})(\d)/, '($1) $2');
+    value = value.replace(/(\d{5})(\d)/, '$1-$2');
+    value = value.replace(/(\d{4})(\d{4})$/, '$1-$2');
+    return value;
+  };
+
+  // Função para aplicar máscara de CEP
+  const applyCepMask = (value) => {
+    // Remove tudo que não é dígito
+    value = value.replace(/\D/g, '');
+    // Limita a 8 dígitos
+    value = value.slice(0, 8);
+    // Aplica a máscara: 01234-567
+    value = value.replace(/(\d{5})(\d)/, '$1-$2');
+    return value;
+  };
+
+  // Estado para controlar tipo de documento (CPF ou CNPJ)
+  const [documentType, setDocumentType] = useState(detectDocumentType(userEdit?.cpf));
+
+  // Aplica máscaras nos dados ao carregar usuário para edição
+  useEffect(() => {
+    if (userEdit) {
+      const maskedData = { ...userEdit };
+
+      // Aplica máscara no CPF/CNPJ se existir
+      if (maskedData.cpf) {
+        const docType = detectDocumentType(maskedData.cpf);
+        maskedData.cpf = docType === 'cpf' ? applyCpfMask(maskedData.cpf) : applyCnpjMask(maskedData.cpf);
+      }
+
+      // Aplica máscara no telefone se existir
+      if (maskedData.telefone) {
+        maskedData.telefone = applyPhoneMask(maskedData.telefone);
+      }
+
+      // Aplica máscara no CEP se existir
+      if (maskedData.cep) {
+        maskedData.cep = applyCepMask(maskedData.cep);
+      }
+
+      setFormData(maskedData);
+    }
+  }, []);
+
   const handleInputChange = (field, value) => {
+    // Aplica máscaras automaticamente conforme o campo
+    if (field === 'cpf') {
+      value = documentType === 'cpf' ? applyCpfMask(value) : applyCnpjMask(value);
+    } else if (field === 'telefone') {
+      value = applyPhoneMask(value);
+    } else if (field === 'cep') {
+      value = applyCepMask(value);
+    }
+
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
-    
+
     // Limpar erro do campo quando o usuário começar a digitar
     if (errors[field]) {
       setErrors(prev => ({
@@ -37,39 +133,47 @@ const UserRegistration = ({onNavigate, userEdit}) => {
 
   const validateForm = () => {
     const newErrors = {};
-    
+
     if (!formData.nome) newErrors.nome = 'Nome é obrigatório';
     if (!formData.email) newErrors.email = 'Email é obrigatório';
     if (!formData.telefone) newErrors.telefone = 'Telefone é obrigatório';
-    if (!formData.cpf) newErrors.cpf = 'CPF é obrigatório';
+    if (!formData.cpf) newErrors.cpf = documentType === 'cpf' ? 'CPF é obrigatório' : 'CNPJ é obrigatório';
     if (!formData.cargo) newErrors.cargo = 'Cargo é obrigatório';
     if (!formData.setor) newErrors.setor = 'Setor é obrigatório';
     if (!formData.nivelacesso) newErrors.nivelacesso = 'Nível de acesso é obrigatório';
     if ((!formData.senha && alterarSenha ) || ( !formData.senha && !formData.id) ) newErrors.senha = 'Senha é obrigatória';
     if (formData.senha && !formData.confirmarSenha) newErrors.confirmarSenha = 'Confirmação de senha é obrigatória';
     if (!formData.cep) newErrors.cep = 'Preencha o CEP';
-    if (!formData.cidade) newErrors.cidade = 'Preencha a cidade';    
-    if (!formData.endereco) newErrors.endereco = 'Preencha o endereço';        
+    if (!formData.cidade) newErrors.cidade = 'Preencha a cidade';
+    if (!formData.endereco) newErrors.endereco = 'Preencha o endereço';
     // Validação de email
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Formato de email inválido';
     }
-    
-    // Validação de CPF (formato básico)
-    if (formData.cpf && !/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(formData.cpf)) {
-      newErrors.cpf = 'Formato de CPF inválido (ex: 123.456.789-00)';
+
+    // Validação de CPF ou CNPJ
+    if (formData.cpf) {
+      if (documentType === 'cpf') {
+        if (!/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(formData.cpf)) {
+          newErrors.cpf = 'Formato de CPF inválido (ex: 123.456.789-00)';
+        }
+      } else {
+        if (!/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(formData.cpf)) {
+          newErrors.cpf = 'Formato de CNPJ inválido (ex: 12.345.678/0001-90)';
+        }
+      }
     }
-    
+
     // Validação de telefone
     if (formData.telefone && !/^\(\d{2}\)\s\d{4,5}-\d{4}$/.test(formData.telefone)) {
       newErrors.telefone = 'Formato de telefone inválido (ex: (11) 99999-9999)';
     }
-    
+
     // Validação de senha
     if (formData.senha && formData.senha.length < 6) {
       newErrors.senha = 'Senha deve ter pelo menos 6 caracteres';
     }
-    
+
     // Validação de confirmação de senha
     if ( formData.senha  && (formData.senha !== formData.confirmarSenha)) {
       newErrors.confirmarSenha = 'Senhas não coincidem';
@@ -95,10 +199,8 @@ const UserRegistration = ({onNavigate, userEdit}) => {
         })
         .catch(error => {
           if(error.response.data.message) {
-            msg = error.response.data.message;
-          }
-          
-          showError('Erro ao atualizar usuário: ' + error.message + ' - ' + msg );
+            showError('Erro: ' + error.response.data.message);                        
+          }                    
         });
       }else {
         try {
@@ -228,12 +330,28 @@ const UserRegistration = ({onNavigate, userEdit}) => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="cpf">CPF *</Label>
+                <Label htmlFor="documentType">Tipo de Documento *</Label>
+                <Select value={documentType} onValueChange={(value) => {
+                  setDocumentType(value);
+                  handleInputChange('cpf', '');
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cpf">CPF</SelectItem>
+                    <SelectItem value="cnpj">CNPJ</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="cpf">{documentType === 'cpf' ? 'CPF' : 'CNPJ'} *</Label>
                 <Input
                   id="cpf"
                   value={formData.cpf}
                   onChange={(e) => handleInputChange('cpf', e.target.value)}
-                  placeholder="123.456.789-00"
+                  placeholder={documentType === 'cpf' ? '123.456.789-00' : '12.345.678/0001-90'}
                   className={errors.cpf ? 'border-red-500' : ''}
                 />
                 {errors.cpf && <p className="text-sm text-red-500">{errors.cpf}</p>}
@@ -364,7 +482,7 @@ const UserRegistration = ({onNavigate, userEdit}) => {
   
  
             </CardHeader>
-            {alterarSenha && 
+            {(alterarSenha || !formData.id) && 
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="senha">Senha *</Label>
@@ -394,6 +512,50 @@ const UserRegistration = ({onNavigate, userEdit}) => {
             </CardContent>
             }
           </Card>
+
+          {/* Acesso à Sistemas */}
+          <Card className="shadow-sm">
+            <CardHeader className="pb-4">
+
+              <CardTitle className="flex items-center text-lg">
+                <Shield className="h-5 w-5 mr-2 text-yellow-600" />
+                Acesso à Sistemas 
+              </CardTitle>
+        
+            </CardHeader>
+    
+            <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
+
+              <div className="space-y-4">
+                 <Label htmlFor="nome">App Nome</Label>
+                 <Switch
+                  checked={!!formData.blocked}
+                  onCheckedChange={(e) => handleInputChange('blocked', e )}
+                  aria-label={formData.blocked ? "Desbloquear usuário" : "Bloquear usuário"}
+                />  
+              </div>  
+
+              <div className="space-y-4">
+                 <Label htmlFor="nome">App 2 Nome</Label>
+                 <Switch
+                  checked={!!formData.blocked}
+                  onCheckedChange={(e) => handleInputChange('blocked', e )}
+                  aria-label={formData.blocked ? "Desbloquear usuário" : "Bloquear usuário"}
+                />  
+              </div>             
+
+              <div className="space-y-4">
+                 <Label htmlFor="nome">App 3 Nome</Label>
+                 <Switch
+                  checked={!!formData.blocked}
+                  onCheckedChange={(e) => handleInputChange('blocked', e )}
+                  aria-label={formData.blocked ? "Desbloquear usuário" : "Bloquear usuário"}
+                />  
+              </div>                       
+
+            </CardContent>
+      
+          </Card>          
 
           {/* Observações */}
           <Card className="shadow-sm">

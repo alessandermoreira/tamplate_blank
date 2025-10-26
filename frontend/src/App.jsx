@@ -12,12 +12,19 @@ import Sidebar from './components/Sidebar.jsx';
 import { ToastProvider } from './contexts/ToastContext.jsx';
 import './App.css';
 import { AuthProvider, useAuth, ProtectedRoute } from './contexts/AuthContext.jsx';
-
+import ProductsList from './components/ProductsList.jsx';
+import ProductRegistration from './components/ProductRegistration.jsx';
+import SalonLoginScreen from './components/SalonLoginScreen.jsx';
+import SalonLoginApp from './components/SalonServicesApp.jsx';
+import SalonRegistrationApp from './components/SalonRegistrationApp.jsx';
+import MarketplaceClientCompact from './components/MarketplaceClientCompact.jsx';
 
 const DashboardApp = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const { user } = useAuth();
   const [userEdit, setUserEdit] = useState({});
+  const [productEdit, setProductEdit] = useState({});
+  
 
   const handleNavigation = (page) => {
     setCurrentPage(page);
@@ -79,19 +86,31 @@ const DashboardApp = () => {
   const currentMonth = 'Julho 2023';
 
   // Função para renderizar o conteúdo da página atual
+  // const ProductsList = React.lazy(() => import('./components/ProductsList.jsx'));
   const renderPageContent = () => {
     switch (currentPage) {
       case 'vehicle-registration':
-        return <VehicleRegistration onNavigate={handleNavigation} />;
+          return <VehicleRegistration onNavigate={handleNavigation} />;
       case 'user-registration':
-        return  <ProtectedRoute requiredRole="administrador">  
-                  <UserRegistration onNavigate={handleNavigation} userEdit={userEdit}/>
-                </ProtectedRoute>;
+          return  <ProtectedRoute requiredRole="administrador">  
+                    <UserRegistration onNavigate={handleNavigation} userEdit={userEdit}/>
+                  </ProtectedRoute>;
       case 'users-list':
-        return <UsersList onNavigate={handleNavigation} setUserEdit={setUserEdit} />;
-      case 'dashboard':
+          return <UsersList onNavigate={handleNavigation} setUserEdit={setUserEdit} />;
+      case 'products-list':
+          return (
+            <ProductsList onNavigate={handleNavigation} setProductEdit={setProductEdit} />
+        );
+      case 'product-registration':
+          return (
+            <ProductRegistration onNavigate={handleNavigation} productEdit={productEdit} />
+        );
+
+      case 'registrar':
+          return <UserRegistration onNavigate={handleNavigation}   />;          
+
       default:
-        return renderDashboard();
+         return  renderDashboard();
     }
   };
 
@@ -124,7 +143,6 @@ const DashboardApp = () => {
                     <Button variant="ghost" size="sm" className="p-2">
                       <User className="h-5 w-5" />
                     </Button>
-
                   </div>
                 </div>
               </div>
@@ -267,7 +285,7 @@ const DashboardApp = () => {
         <Sidebar 
           currentPage={currentPage} 
           onNavigate={handleNavigation}
-        />
+        />        
         
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col md:ml-0">
@@ -303,7 +321,12 @@ const AppContent = () => {
   }
 
   if (!isAuthenticated) {
-    return <Login />;
+
+    return (
+        <ToastProvider>
+          <Login />
+        </ToastProvider>
+        ) ;
   }
 
   return (

@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button.jsx';
-import { 
-  Home, 
-  Truck, 
-  UserPlus, 
-  Menu, 
+import {
+  Home,
+  Package,
+  UserPlus,
+  Menu,
   X,
   ChevronLeft,
   Settings,
   LogOut,
-  Users
+  Users,
+  LogIn,
+  Scissors,
+  Store,
+  Briefcase
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -26,10 +30,42 @@ const Sidebar = ({ currentPage, onNavigate, className = "" }) => {
     },
     {
       id: 'users-list',
-      label: 'Listar Usuários',
+      label: 'Clientes',
       icon: Users,
-      description: 'Visualizar usuários registrados'
+      description: 'Visualizar e gerenciar clientes'
+    },
+    {
+      id: 'products-list',
+      label: 'Produtos',
+      icon: Package,
+      description: 'Visualizar nossos produtos'
     }
+    // {
+    //   id: 'salon-login',
+    //   label: 'Login Salão',
+    //   icon: LogIn,
+    //   description: 'Acessar tela de login do salão'
+    // },
+    // {
+    //   id: 'salon-app',
+    //   label: 'Salão App',
+    //   icon: Scissors,
+    //   description: 'Acessar app do salão'
+    // },
+    // {
+    //   id: 'salon-registration-app',
+    //   label: 'Salão Registration App',
+    //   icon: UserPlus,
+    //   description: 'Acessar app do salão'
+    // }  ,
+    // {
+    //   id: 'salon-marketplace-app',
+    //   label: 'Salão Marketplace App',
+    //   icon: Store,
+    //   description: 'Acessar marketplace do salão'
+    // }
+
+
   ];
 
   const toggleSidebar = () => {
