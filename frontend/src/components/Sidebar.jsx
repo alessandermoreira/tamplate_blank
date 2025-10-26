@@ -36,7 +36,7 @@ const Sidebar = ({ currentPage, onNavigate, className = "" }) => {
     },
     {
       id: 'products-list',
-      label: 'Produtos',
+      label: 'Sistemas',
       icon: Package,
       description: 'Visualizar nossos produtos'
     }

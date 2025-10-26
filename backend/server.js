@@ -338,6 +338,81 @@ app.put("/products/:id", authenticateToken, async (req, res) => {
   }
 });
 
+// ============== ROTAS DE VÍNCULO USUÁRIO-PRODUTO ==============
+
+// Buscar produtos vinculados a um usuário
+app.get("/users/:userId/products", authenticateToken, async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const result = await pool.query(
+      `SELECT p.* FROM Products p
+       INNER JOIN Users_Products up ON p.id = up.product_id
+       WHERE up.user_id = $1
+       ORDER BY p.name`,
+      [userId]
+    );
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error("Erro ao buscar produtos do usuário:", error);
+    res.status(500).json({ message: "Erro ao buscar produtos do usuário" });
+  }
+});
+
+// Vincular produtos a um usuário
+app.post("/users/:userId/products", authenticateToken, async (req, res) => {
+  const { userId } = req.params;
+  const { productIds } = req.body; // Array de IDs de produtos
+
+  if (!Array.isArray(productIds)) {
+    return res.status(400).json({ message: "productIds deve ser um array" });
+  }
+
+  try {
+    // Primeiro, remove todos os vínculos existentes
+    await pool.query("DELETE FROM Users_Products WHERE user_id = $1", [userId]);
+
+    // Depois, insere os novos vínculos
+    if (productIds.length > 0) {
+      const values = productIds.map((productId, index) =>
+        `($1, $${index + 2})`
+      ).join(", ");
+
+      const query = `INSERT INTO Users_Products (user_id, product_id) VALUES ${values}`;
+      await pool.query(query, [userId, ...productIds]);
+    }
+
+    res.status(200).json({
+      message: "Produtos vinculados com sucesso",
+      count: productIds.length
+    });
+  } catch (error) {
+    console.error("Erro ao vincular produtos ao usuário:", error);
+    res.status(500).json({ message: "Erro ao vincular produtos ao usuário" });
+  }
+});
+
+// Desvincular produto específico de um usuário
+app.delete("/users/:userId/products/:productId", authenticateToken, async (req, res) => {
+  const { userId, productId } = req.params;
+
+  try {
+    const result = await pool.query(
+      "DELETE FROM Users_Products WHERE user_id = $1 AND product_id = $2",
+      [userId, productId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: "Vínculo não encontrado" });
+    }
+
+    res.status(200).json({ message: "Produto desvinculado com sucesso" });
+  } catch (error) {
+    console.error("Erro ao desvincular produto:", error);
+    res.status(500).json({ message: "Erro ao desvincular produto" });
+  }
+});
+
 // Roda o servidor na porta especificada
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);

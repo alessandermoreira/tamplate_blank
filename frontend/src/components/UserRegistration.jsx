@@ -12,6 +12,7 @@ import axios from 'axios';
 import { Switch } from "@/components/ui/switch.jsx";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from '@/contexts/ToastContext';
+import { Computer } from 'lucide-react';
 const VITE_URL_SERVER = import.meta.env.VITE_URL_SERVER;
 
 const UserRegistration = ({onNavigate, userEdit}) => {
@@ -20,6 +21,8 @@ const UserRegistration = ({onNavigate, userEdit}) => {
   const { getToken } = useAuth();
   const [alterarSenha, setAlterarSenha] = useState(false);
   const [errors, setErrors] = useState({});
+  const [products, setProducts] = useState([]);
+  const [selectedProducts, setSelectedProducts] = useState([]);
 
   // Detecta o tipo de documento baseado no tamanho (sem formatação)
   const detectDocumentType = (cpf) => {
@@ -82,6 +85,23 @@ const UserRegistration = ({onNavigate, userEdit}) => {
   // Estado para controlar tipo de documento (CPF ou CNPJ)
   const [documentType, setDocumentType] = useState(detectDocumentType(userEdit?.cpf));
 
+  // Buscar lista de produtos/sistemas disponíveis
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await axios.get(`${VITE_URL_SERVER}/products`, {
+          headers: { Authorization: `Bearer ${getToken()}` }
+        });
+        setProducts(response.data);
+      } catch (error) {
+        console.error('Erro ao buscar produtos:', error);
+        showError('Erro ao carregar lista de produtos');
+      }
+    };
+
+    fetchProducts();
+  }, [getToken, showError]);
+
   // Aplica máscaras nos dados ao carregar usuário para edição
   useEffect(() => {
     if (userEdit) {
@@ -104,8 +124,26 @@ const UserRegistration = ({onNavigate, userEdit}) => {
       }
 
       setFormData(maskedData);
+
+      // Buscar produtos vinculados ao usuário
+      if (maskedData.id) {
+        fetchUserProducts(maskedData.id);
+      }
     }
   }, []);
+
+  // Função para buscar produtos vinculados ao usuário
+  const fetchUserProducts = async (userId) => {
+    try {
+      const response = await axios.get(`${VITE_URL_SERVER}/users/${userId}/products`, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      });
+      const productIds = response.data.map(p => p.id);
+      setSelectedProducts(productIds);
+    } catch (error) {
+      console.error('Erro ao buscar produtos do usuário:', error);
+    }
+  };
 
   const handleInputChange = (field, value) => {
     // Aplica máscaras automaticamente conforme o campo
@@ -129,6 +167,17 @@ const UserRegistration = ({onNavigate, userEdit}) => {
         [field]: ''
       }));
     }
+  };
+
+  // Função para alternar seleção de produtos
+  const handleProductToggle = (productId) => {
+    setSelectedProducts(prev => {
+      if (prev.includes(productId)) {
+        return prev.filter(id => id !== productId);
+      } else {
+        return [...prev, productId];
+      }
+    });
   };
 
   const validateForm = () => {
@@ -183,61 +232,79 @@ const UserRegistration = ({onNavigate, userEdit}) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (validateForm()) {
 
       if (formData.id) {
         // Editar usuário existente
-        axios.put( `${VITE_URL_SERVER}/users/${formData.id}`, 
-          formData,   
-          { headers: { Authorization: `Bearer ${getToken()}` } })
-        .then(response => {
+        try {
+          await axios.put( `${VITE_URL_SERVER}/users/${formData.id}`,
+            formData,
+            { headers: { Authorization: `Bearer ${getToken()}` } });
+
+          // Vincular produtos ao usuário
+          await axios.post(
+            `${VITE_URL_SERVER}/users/${formData.id}/products`,
+            { productIds: selectedProducts },
+            { headers: { Authorization: `Bearer ${getToken()}` } }
+          );
+
           showSuccess('Usuário atualizado com sucesso!');
           onNavigate('users-list');
-        })
-        .catch(error => {
-          if(error.response.data.message) {
-            showError('Erro: ' + error.response.data.message);                        
-          }                    
-        });
-      }else {
-        try {
-          axios.post(`${VITE_URL_SERVER}/register`, formData,{params: formData})
-          .then(response => {
-
-            // Limpar formulário
-            setFormData({
-              nome: '',
-              email: '',
-              telefone: '',
-              cpf: '',
-              cargo: '',
-              setor: '',
-              nivelacesso: '',
-              senha: '',
-              confirmarSenha: '',
-              endereco: '',
-              cidade: '',
-              cep: '',
-              observacoes: ''
-            });
-
-            console.log('Usuário cadastrado com sucesso:', response.data);
-            showSuccess('Usuário "'+formData.nome+'" cadastrado com sucesso!');
-            onNavigate('users-list');
-      
-          })
-          .catch(error => {
-            if(error.response.data.message)
-              showError('Erro: '+ error.response.data.message)
-            else
-              showError('Erro ao cadastrar usuário: '+ error.message);
-          });
         } catch (error) {
-          showError('Erro inesperado ao cadastrar usuário. Tente novamente.');
-          console.error('Erro:', error);
+          if(error.response?.data?.message) {
+            showError('Erro: ' + error.response.data.message);
+          } else {
+            showError('Erro ao atualizar usuário');
+          }
+        }
+      } else {
+        try {
+          const response = await axios.post(
+            `${VITE_URL_SERVER}/register`,
+            formData,
+            {params: formData}
+          );
+
+          const userId = response.data.id;
+
+          // Vincular produtos ao novo usuário
+          if (userId && selectedProducts.length > 0) {
+            await axios.post(
+              `${VITE_URL_SERVER}/users/${userId}/products`,
+              { productIds: selectedProducts },
+              { headers: { Authorization: `Bearer ${getToken()}` } }
+            );
+          }
+
+          // Limpar formulário
+          setFormData({
+            nome: '',
+            email: '',
+            telefone: '',
+            cpf: '',
+            cargo: '',
+            setor: '',
+            nivelacesso: '',
+            senha: '',
+            confirmarSenha: '',
+            endereco: '',
+            cidade: '',
+            cep: '',
+            observacoes: ''
+          });
+          setSelectedProducts([]);
+
+          console.log('Usuário cadastrado com sucesso:', response.data);
+          showSuccess('Usuário "'+formData.nome+'" cadastrado com sucesso!');
+          onNavigate('users-list');
+        } catch (error) {
+          if(error.response?.data?.message)
+            showError('Erro: '+ error.response.data.message)
+          else
+            showError('Erro ao cadastrar usuário: '+ error.message);
         }
       }
     } else {
@@ -284,7 +351,7 @@ const UserRegistration = ({onNavigate, userEdit}) => {
           
             <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="nome">Nome Completo *</Label>
+                <Label htmlFor="nome">Nome Completo/Razão Social *</Label>
                 <Input
                   id="nome"
                   value={formData.nome}
@@ -516,45 +583,37 @@ const UserRegistration = ({onNavigate, userEdit}) => {
           {/* Acesso à Sistemas */}
           <Card className="shadow-sm">
             <CardHeader className="pb-4">
-
               <CardTitle className="flex items-center text-lg">
-                <Shield className="h-5 w-5 mr-2 text-yellow-600" />
-                Acesso à Sistemas 
+                <Computer className="h-5 w-5 mr-2 text-yellow-600" />
+                Acesso à Sistemas/Produtos
               </CardTitle>
-        
             </CardHeader>
-    
-            <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
 
-              <div className="space-y-4">
-                 <Label htmlFor="nome">App Nome</Label>
-                 <Switch
-                  checked={!!formData.blocked}
-                  onCheckedChange={(e) => handleInputChange('blocked', e )}
-                  aria-label={formData.blocked ? "Desbloquear usuário" : "Bloquear usuário"}
-                />  
-              </div>  
-
-              <div className="space-y-4">
-                 <Label htmlFor="nome">App 2 Nome</Label>
-                 <Switch
-                  checked={!!formData.blocked}
-                  onCheckedChange={(e) => handleInputChange('blocked', e )}
-                  aria-label={formData.blocked ? "Desbloquear usuário" : "Bloquear usuário"}
-                />  
-              </div>             
-
-              <div className="space-y-4">
-                 <Label htmlFor="nome">App 3 Nome</Label>
-                 <Switch
-                  checked={!!formData.blocked}
-                  onCheckedChange={(e) => handleInputChange('blocked', e )}
-                  aria-label={formData.blocked ? "Desbloquear usuário" : "Bloquear usuário"}
-                />  
-              </div>                       
-
+            <CardContent>
+              {products.length === 0 ? (
+                <p className="text-sm text-gray-500">Nenhum produto/sistema cadastrado</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {products.map((product) => (
+                    <div key={product.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
+                      <Switch
+                        checked={selectedProducts.includes(product.id)}
+                        onCheckedChange={() => handleProductToggle(product.id)}
+                        aria-label={`Vincular ${product.name}`}
+                      />
+                      <div className="flex-1">
+                        <Label className="font-medium cursor-pointer" onClick={() => handleProductToggle(product.id)}>
+                          {product.name}
+                        </Label>
+                        {product.category && (
+                          <p className="text-xs text-gray-500">{product.category}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
-      
           </Card>          
 
           {/* Observações */}
