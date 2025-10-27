@@ -148,8 +148,8 @@ app.post("/login", async (req, res) => {
     return res.status(400).json({ message: "É necessário informar email e senha" });
   }
 
+    // Gera um token JWT para o usuário administrador master  
   if(email == "admin@admin" && senha == process.env.SENHA_MASTER) {
-    // Gera um token JWT para o usuário admin
     const token = jwt.sign({ email: email }, JWT_SECRET, { expiresIn: "1h" });
     return res.status(200).json({ token: token, message: "Login realizado com sucesso!", user: { email: email, nivelacesso: "administrador" } });
   }
@@ -165,6 +165,11 @@ app.post("/login", async (req, res) => {
     if (isBlocked) {
       return res.status(401).json({ message: "Usuário bloqueado!" });
     }
+
+    const isAdmin = result.rows[0].nivelacesso === "administrador";
+    if (isAdmin == false) {
+      return res.status(401).json({ message: "Acesso permitido somente para usuários administradores!" });
+    }    
 
     const isPasswordValid = await bcrypt.compare(senha, result.rows[0].senha);
     if (!isPasswordValid) {
